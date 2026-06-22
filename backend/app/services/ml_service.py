@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 
@@ -117,53 +116,3 @@ def get_food_recommendations(prot_deficit: float, carb_deficit: float, fat_defic
         
     return results
 
-def forecast_weight_trajectory(weight_history: list, calorie_balance_history: list, current_weight: float) -> list:
-    # calorie_balance_history contains: logged calories - TDEE for each recorded day
-    days_logged = len(calorie_balance_history)
-    
-    # Check if we have enough historical data to fit a regression line
-    if days_logged < 5:
-        # Cold start: Create a synthetic training dataset based on thermodynamic metabolic logic
-        # -7700 kcal deficit = roughly -1.0 kg weight change
-        X_train = []
-        y_train = []
-        simulated_weight = current_weight
-        
-        for day in range(10):
-            # Assume a baseline average calorie deficit of -500 kcal for training
-            net_cal = -500
-            X_train.append([day, net_cal])
-            simulated_weight += (net_cal / 7700.0)
-            y_train.append(simulated_weight)
-            
-        model = LinearRegression()
-        model.fit(X_train, y_train)
-    else:
-        # Fit regression on the user's actual chronological data
-        X_train = []
-        y_train = []
-        for day_num, balance in enumerate(calorie_balance_history):
-            X_train.append([day_num, balance])
-            y_train.append(weight_history[day_num])
-            
-        model = LinearRegression()
-        model.fit(X_train, y_train)
-        
-    # Calculate user's average historical daily calorie balance
-    avg_balance = float(np.mean(calorie_balance_history)) if days_logged > 0 else -500.0
-    
-    # Predict chronological weight logs for the next 30 days
-    start_day = days_logged if days_logged > 0 else 0
-    predictions = []
-    
-    for day in range(1, 31):
-        future_day = start_day + day
-        pred_w = model.predict([[future_day, avg_balance]])[0]
-        # Make sure predicted weight doesn't drop to zero or negative
-        pred_w = max(pred_w, 30.0)
-        predictions.append({
-            "day": day,
-            "weight": round(float(pred_w), 2)
-        })
-        
-    return predictions

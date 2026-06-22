@@ -88,3 +88,42 @@ def test_nutrition_system_flow():
         response = client.get(f"/food-logs/{meal_log_id}")
         assert response.status_code == 404
         print("[+] Cascading delete verification passed: Food log deleted successfully.")
+
+
+def test_google_login_flow():
+    from unittest.mock import patch
+    from app.database import init_db
+    
+    init_db()
+    
+    with TestClient(app) as client:
+        # Mock Google token verification response
+        mock_id_info = {
+            "email": "test_google_user@gmail.com",
+            "name": "Google Tester"
+        }
+        
+        # We patch the google_id_token verification module imported in users.py
+        with patch("app.routers.users.google_id_token.verify_oauth2_token", return_value=mock_id_info):
+            # 1. Perform Google login (registers new user since email does not exist)
+            response = client.post("/users/google-login", json={"credential": "mock_token_123"})
+            assert response.status_code == 200, f"Error: {response.text}"
+            user = response.json()
+            assert user["email"] == "test_google_user@gmail.com"
+            assert user["username"] == "test_google_user"
+            assert user["is_verified"] is True
+            user_id = user["id"]
+            print(f"\n[+] Created Mock Google User (ID: {user_id})")
+
+            # 2. Perform Google login again (retrieves the existing user)
+            response = client.post("/users/google-login", json={"credential": "mock_token_123"})
+            assert response.status_code == 200, f"Error: {response.text}"
+            user_existing = response.json()
+            assert user_existing["id"] == user_id
+            print("[+] Successfully logged in existing Google user")
+
+            # 3. Clean up test user
+            response = client.delete(f"/users/{user_id}")
+            assert response.status_code == 204
+            print("[+] Cleaned up test Google user successfully")
+

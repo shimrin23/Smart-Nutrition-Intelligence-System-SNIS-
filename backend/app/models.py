@@ -6,12 +6,21 @@ from sqlmodel import SQLModel, Field, Relationship
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(index=True, unique=True, nullable=False)
+    email: Optional[str] = Field(default=None, index=True, unique=True, nullable=True)
+    display_name: Optional[str] = Field(default=None, nullable=True)
     age: int
     gender: str  # male, female, other
     weight_kg: float
     height_cm: float
     activity_level: str  # sedentary, lightly_active, moderately_active, active, very_active
     goal: str  # lose_weight, maintain, gain_weight
+    password: Optional[str] = Field(default=None, nullable=True)
+    
+    # Email verification fields
+    is_verified: bool = Field(default=False)
+    verification_token: Optional[str] = Field(default=None, nullable=True)
+    reset_token: Optional[str] = Field(default=None, nullable=True)
+    reset_token_expiry: Optional[datetime] = Field(default=None, nullable=True)
     
     # Calculated nutrition targets
     target_calories: int
