@@ -30,5 +30,6 @@ dist-ssr
 .env.test.local
 .env.production.local
 *.env
-*.env.*
+# Allow .env.production (non-secret, needed for Vercel build)
+!.env.production
 

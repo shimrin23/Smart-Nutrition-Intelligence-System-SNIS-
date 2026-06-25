@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_db
 from app.routers import users, food_logs, ai, ml
+from app.config import settings
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
@@ -25,9 +26,17 @@ app = FastAPI(
 )
 
 # Configure CORS so our React frontend can connect
+allowed_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+# Add deployed frontend URL from env (e.g. https://your-app.vercel.app)
+if settings.FRONTEND_URL and "localhost" not in settings.FRONTEND_URL:
+    allowed_origins.append(settings.FRONTEND_URL)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
