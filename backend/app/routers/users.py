@@ -87,11 +87,8 @@ def send_email_background(to_email: str, subject: str, html_body: str):
         part = MIMEText(html_body, "html")
         msg.attach(part)
 
-        # Use port 587 with STARTTLS (port 465 is often blocked on cloud servers)
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
+        # Testing port 465 SSL
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
             server.sendmail(settings.MAIL_FROM, to_email, msg.as_string())
         print(f"[+] Email sent to {to_email}")
