@@ -48,6 +48,7 @@ jobs:
         DB_PASSWORD: test_password
         DB_NAME: snis
         GEMINI_API_KEY: fake_key_for_testing
+        GOOGLE_CLIENT_ID: fake_google_client_id.apps.googleusercontent.com
       run: |
         cd backend
         pytest -v test_api.py
