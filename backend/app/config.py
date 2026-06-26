@@ -27,4 +27,7 @@ class Settings:
     # Google OAuth
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
 
+    # Resend email API (SMTP is blocked on Railway)
+    RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
+
 settings = Settings()
