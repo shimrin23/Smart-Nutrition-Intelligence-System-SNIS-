@@ -78,6 +78,8 @@ def email_to_display_name(email: str) -> str:
 
 def send_email_background(to_email: str, subject: str, html_body: str):
     """Send email via Gmail SMTP (runs in background)."""
+    print(f"[*] Attempting to send email to {to_email} via smtp.gmail.com:465")
+    print(f"[*] MAIL_USERNAME={settings.MAIL_USERNAME!r}, MAIL_FROM={settings.MAIL_FROM!r}")
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
