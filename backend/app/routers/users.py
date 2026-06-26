@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import resend
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
 
@@ -77,25 +78,19 @@ def email_to_display_name(email: str) -> str:
     return email.split("@")[0]
 
 def send_email_background(to_email: str, subject: str, html_body: str):
-    """Send email via Gmail SMTP (runs in background)."""
-    print(f"[*] Attempting to send email to {to_email} via smtp.gmail.com:465")
-    print(f"[*] MAIL_USERNAME={settings.MAIL_USERNAME!r}, MAIL_FROM={settings.MAIL_FROM!r}")
+    """Send email via Resend API (SMTP is blocked on Railway)."""
+    print(f"[*] Sending email to {to_email} via Resend API")
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = f"{settings.MAIL_FROM_NAME} <{settings.MAIL_FROM}>"
-        msg["To"] = to_email
-
-        part = MIMEText(html_body, "html")
-        msg.attach(part)
-
-        # Testing port 465 SSL
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
-            server.sendmail(settings.MAIL_FROM, to_email, msg.as_string())
-        print(f"[+] Email sent to {to_email}")
+        resend.api_key = settings.RESEND_API_KEY
+        resend.Emails.send({
+            "from": f"{settings.MAIL_FROM_NAME} <onboarding@resend.dev>",
+            "to": [to_email],
+            "subject": subject,
+            "html": html_body,
+        })
+        print(f"[+] Email sent via Resend to {to_email}")
     except Exception as e:
-        print(f"[-] Failed to send email to {to_email}: {e}")
+        print(f"[-] Resend failed for {to_email}: {e}")
 
 def send_verification_email(background_tasks: BackgroundTasks, to_email: str, token: str):
     verify_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
