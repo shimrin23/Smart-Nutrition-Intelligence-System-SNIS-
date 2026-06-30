@@ -83,12 +83,12 @@ def send_email_background(to_email: str, subject: str, html_body: str):
     try:
         resend.api_key = settings.RESEND_API_KEY
         resend.Emails.send({
-            "from": f"{settings.MAIL_FROM_NAME} <onboarding@resend.dev>",
+            "from": f"{settings.MAIL_FROM_NAME} <{settings.MAIL_FROM}>",
             "to": [to_email],
             "subject": subject,
             "html": html_body,
         })
-        print(f"[+] Email sent via Resend to {to_email}")
+        print(f"[+] Email sent via Resend to {to_email} from {settings.MAIL_FROM}")
     except Exception as e:
         print(f"[-] Resend failed for {to_email}: {e}")
 
