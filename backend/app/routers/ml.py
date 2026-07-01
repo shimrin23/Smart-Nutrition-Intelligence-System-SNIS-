@@ -7,6 +7,7 @@ from app.services import ml_service
 from app.routers.users import calculate_targets
 from datetime import datetime, date, timedelta
 from pydantic import BaseModel
+from app.auth import get_current_user
 
 router = APIRouter(prefix="/ml", tags=["Machine Learning Analytics"])
 
@@ -18,7 +19,9 @@ class RecommendationResponse(BaseModel):
     category: str
 
 @router.get("/recommend-foods/{user_id}", response_model=List[RecommendationResponse])
-def recommend_foods_for_user(user_id: int, db: Session = Depends(get_session)):
+def recommend_foods_for_user(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_session)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User profile not found")

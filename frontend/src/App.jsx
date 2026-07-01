@@ -218,7 +218,10 @@ function App() {
       const savedUserId = localStorage.getItem('activeUserId');
       if (savedUserId) {
         const parsedId = parseInt(savedUserId);
-        const res = await fetch(`${API_BASE}/users/${parsedId}`);
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API_BASE}/users/${parsedId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
         if (res.ok) {
           const user = await res.json();
           setActiveUser(user);
@@ -240,9 +243,10 @@ function App() {
         body: JSON.stringify({ email: loginEmail, password: loginPassword })
       });
       if (res.ok) {
-        const user = await res.json();
-        setActiveUser(user);
-        localStorage.setItem('activeUserId', user.id.toString());
+        const data = await res.json();
+        setActiveUser(data.user);
+        localStorage.setItem('activeUserId', data.user.id.toString());
+        localStorage.setItem('token', data.access_token);
         setLoginEmail('');
         setLoginPassword('');
       } else {
@@ -352,6 +356,7 @@ function App() {
   const handleSignOut = () => {
     setActiveUser(null);
     localStorage.removeItem('activeUserId');
+    localStorage.removeItem('token');
     setActiveTab('dashboard'); // Reset tab
     setShowDangerZone(false);
   };
@@ -365,9 +370,10 @@ function App() {
         body: JSON.stringify({ credential: response.credential })
       });
       if (res.ok) {
-        const user = await res.json();
-        setActiveUser(user);
-        localStorage.setItem('activeUserId', user.id.toString());
+        const data = await res.json();
+        setActiveUser(data.user);
+        localStorage.setItem('activeUserId', data.user.id.toString());
+        localStorage.setItem('token', data.access_token);
       } else {
         const errData = await res.json();
         setAuthError(errData.detail || 'Google sign-in failed.');
@@ -388,7 +394,10 @@ function App() {
 
   const fetchLogs = async (userId) => {
     try {
-      const res = await fetch(`${API_BASE}/food-logs/user/${userId}`);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE}/food-logs/user/${userId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) {
         const data = await res.json();
         setFoodLogs(data);
@@ -407,7 +416,10 @@ function App() {
       if (params.length > 0) {
         url += `?${params.join('&')}`;
       }
-      const res = await fetch(url);
+      const token = localStorage.getItem('token');
+      const res = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) {
         const data = await res.json();
         setDailySummary(data);
@@ -420,7 +432,10 @@ function App() {
   const fetchMlData = async (userId) => {
     try {
       // 1. Fetch recommendations
-      const recRes = await fetch(`${API_BASE}/ml/recommend-foods/${userId}`);
+      const token = localStorage.getItem('token');
+      const recRes = await fetch(`${API_BASE}/ml/recommend-foods/${userId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (recRes.ok) {
         const recData = await recRes.json();
         setMlRecommendations(recData);
@@ -444,9 +459,10 @@ function App() {
         activity_level: activeUser.activity_level,
         goal: activeUser.goal
       };
+      const token = localStorage.getItem('token');
       const res = await fetch(`${API_BASE}/users/${activeUser.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(payload)
       });
       if (res.ok) {
@@ -471,8 +487,10 @@ function App() {
     if (!confirmDelete) return;
 
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch(`${API_BASE}/users/${activeUser.id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         alert("Account deleted successfully.");
@@ -493,9 +511,10 @@ function App() {
       return;
     }
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch(`${API_BASE}/food-logs/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
           ...newLog,
           quantity: newLog.quantity === '' ? 0.0 : parseFloat(newLog.quantity),
@@ -538,8 +557,10 @@ function App() {
 
   const handleDeleteLog = async (logId) => {
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch(`${API_BASE}/food-logs/${logId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         fetchLogs(activeUser.id);
@@ -665,9 +686,10 @@ function App() {
     }
 
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch(`${API_BASE}/ai/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
           user_id: activeUser.id,
           message: userMsgText,

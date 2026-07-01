@@ -5,6 +5,7 @@ from app.database import get_session
 from app.models import FoodLog, User
 from datetime import datetime, date, timedelta
 from pydantic import BaseModel
+from app.auth import get_current_user
 
 router = APIRouter(prefix="/food-logs", tags=["Food Logs"])
 
@@ -53,7 +54,9 @@ class DailySummary(BaseModel):
     total_sodium: float
 
 @router.post("/", response_model=FoodLog, status_code=status.HTTP_201_CREATED)
-def create_food_log(log_data: FoodLogCreate, db: Session = Depends(get_session)):
+def create_food_log(log_data: FoodLogCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_session)):
+    if current_user.id != log_data.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     # Verify user exists
     user = db.get(User, log_data.user_id)
     if not user:
@@ -84,7 +87,9 @@ def create_food_log(log_data: FoodLogCreate, db: Session = Depends(get_session))
     return new_log
 
 @router.get("/user/{user_id}", response_model=List[FoodLog])
-def get_user_food_logs(user_id: int, db: Session = Depends(get_session)):
+def get_user_food_logs(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_session)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     # Verify user exists
     user = db.get(User, user_id)
     if not user:
@@ -99,8 +104,11 @@ def get_user_daily_summary(
     user_id: int, 
     start_date: Optional[date] = None, 
     end_date: Optional[date] = None, 
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_session)
 ):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     # Verify user exists
     user = db.get(User, user_id)
     if not user:
@@ -163,17 +171,21 @@ def get_user_daily_summary(
     return summaries
 
 @router.get("/{log_id}", response_model=FoodLog)
-def get_food_log(log_id: int, db: Session = Depends(get_session)):
+def get_food_log(log_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_session)):
     log = db.get(FoodLog, log_id)
     if not log:
         raise HTTPException(status_code=404, detail="Food log entry not found")
+    if log.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     return log
 
 @router.put("/{log_id}", response_model=FoodLog)
-def update_food_log(log_id: int, log_data: FoodLogUpdate, db: Session = Depends(get_session)):
+def update_food_log(log_id: int, log_data: FoodLogUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_session)):
     log = db.get(FoodLog, log_id)
     if not log:
         raise HTTPException(status_code=404, detail="Food log entry not found")
+    if log.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
         
     # Update fields provided
     update_dict = log_data.model_dump(exclude_unset=True)
@@ -186,10 +198,12 @@ def update_food_log(log_id: int, log_data: FoodLogUpdate, db: Session = Depends(
     return log
 
 @router.delete("/{log_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_food_log(log_id: int, db: Session = Depends(get_session)):
+def delete_food_log(log_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_session)):
     log = db.get(FoodLog, log_id)
     if not log:
         raise HTTPException(status_code=404, detail="Food log entry not found")
+    if log.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     db.delete(log)
     db.commit()
     return None

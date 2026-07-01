@@ -6,6 +6,7 @@ from app.database import get_session
 from app.models import User
 from app.services import gemini_service
 import google.generativeai as genai
+from app.auth import get_current_user
 
 router = APIRouter(prefix="/ai", tags=["AI Integration"])
 
@@ -48,7 +49,9 @@ async def analyze_food_image(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/chat")
-def chat_coach(request: ChatRequest, db: Session = Depends(get_session)):
+def chat_coach(request: ChatRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_session)):
+    if current_user.id != request.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     user = db.get(User, request.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User profile not found")

@@ -9,6 +9,7 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta
 import smtplib
+from app.auth import get_password_hash, create_access_token, get_current_user, verify_password
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import resend
@@ -208,7 +209,7 @@ def register_user(user_data: UserRegister, background_tasks: BackgroundTasks, db
         username=unique_username,
         email=user_data.email.lower(),
         display_name=display_name,
-        password=hash_password(user_data.password),
+        password=get_password_hash(user_data.password),
         age=user_data.age,
         gender=user_data.gender,
         weight_kg=user_data.weight_kg,
@@ -244,20 +245,21 @@ def verify_email(token: str, db: Session = Depends(get_session)):
     return {"message": "Email verified successfully! You can now log in."}
 
 
-@router.post("/login", response_model=User)
+@router.post("/login")
 def login_user(login_data: UserLogin, db: Session = Depends(get_session)):
     """Login with email + password."""
     user = db.exec(select(User).where(User.email == login_data.email.lower())).first()
     if not user:
         raise HTTPException(status_code=400, detail="Invalid email or password")
 
-    if not user.password or user.password != hash_password(login_data.password):
+    if not user.password or (not verify_password(login_data.password, user.password) and user.password != hashlib.sha256(login_data.password.encode()).hexdigest()):
         raise HTTPException(status_code=400, detail="Invalid email or password")
 
     if not user.is_verified:
         raise HTTPException(status_code=403, detail="Please verify your email before logging in. Check your inbox.")
 
-    return user
+    access_token = create_access_token(data={"sub": str(user.id)})
+    return {"access_token": access_token, "user": user}
 
 
 @router.post("/forgot-password")
@@ -285,7 +287,7 @@ def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_sess
     if user.reset_token_expiry and datetime.utcnow() > user.reset_token_expiry:
         raise HTTPException(status_code=400, detail="Reset link has expired. Please request a new one.")
 
-    user.password = hash_password(request.new_password)
+    user.password = get_password_hash(request.new_password)
     user.reset_token = None
     user.reset_token_expiry = None
     db.add(user)
@@ -293,7 +295,7 @@ def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_sess
     return {"message": "Password reset successfully! You can now log in."}
 
 
-@router.post("/google-login", response_model=User)
+@router.post("/google-login")
 def google_login(request: GoogleLoginRequest, db: Session = Depends(get_session)):
     """Sign in / Register with Google OAuth ID Token."""
     if not settings.GOOGLE_CLIENT_ID:
@@ -325,7 +327,8 @@ def google_login(request: GoogleLoginRequest, db: Session = Depends(get_session)
             db.add(existing_user)
             db.commit()
             db.refresh(existing_user)
-        return existing_user
+        access_token = create_access_token(data={"sub": str(existing_user.id)})
+        return {"access_token": access_token, "user": existing_user}
 
     # New user — auto-register with default values
     # Use google_name as display_name if available, otherwise use email prefix
@@ -365,7 +368,8 @@ def google_login(request: GoogleLoginRequest, db: Session = Depends(get_session)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    return new_user
+    access_token = create_access_token(data={"sub": str(new_user.id)})
+    return {"access_token": access_token, "user": new_user}
 
 
 @router.post("/resend-verification")
@@ -398,7 +402,7 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_session)):
     new_user = User(
         username=user_data.username,
         display_name=user_data.username,
-        password=hash_password(user_data.password) if user_data.password else None,
+        password=get_password_hash(user_data.password) if user_data.password else None,
         age=user_data.age,
         gender=user_data.gender,
         weight_kg=user_data.weight_kg,
@@ -420,7 +424,9 @@ def get_users(db: Session = Depends(get_session)):
 
 
 @router.get("/{user_id}", response_model=User)
-def get_user(user_id: int, db: Session = Depends(get_session)):
+def get_user(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_session)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User profile not found")
@@ -428,7 +434,9 @@ def get_user(user_id: int, db: Session = Depends(get_session)):
 
 
 @router.put("/{user_id}", response_model=User)
-def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_session)):
+def update_user(user_id: int, user_data: UserUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_session)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User profile not found")
@@ -451,7 +459,9 @@ def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_s
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(user_id: int, db: Session = Depends(get_session)):
+def delete_user(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_session)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User profile not found")
