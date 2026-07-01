@@ -948,7 +948,7 @@ function App() {
                 onClick={() => setActiveTab('settings')}
               >
                 <Settings size={18} />
-                <span>Goal Settings</span>
+                <span>Settings</span>
               </button>
             </div>
 
