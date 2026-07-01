@@ -51,7 +51,7 @@ def get_nutrition_for_item(food_name: str, weight_grams: float) -> dict:
     multiplier = weight_grams / 100.0
     
     return {
-        "food_name": food.get("description", food_name).title(),
+        "food_name": food_name.title(),
         "calories": get_nutrient_val(1008) * multiplier,
         "protein": get_nutrient_val(1003) * multiplier,
         "carbs": get_nutrient_val(1005) * multiplier,

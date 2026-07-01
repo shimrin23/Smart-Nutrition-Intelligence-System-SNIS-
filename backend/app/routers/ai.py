@@ -43,7 +43,8 @@ def analyze_food_text(request: TextAnalysisRequest, db: Session = Depends(get_se
             "fiber": cached.fiber,
             "iron": cached.iron,
             "calcium": cached.calcium,
-            "sodium": cached.sodium
+            "sodium": cached.sodium,
+            "explanation": f"Your tracked meal includes {cached.food_name}. It provides an estimated {cached.calories:.0f} calories, consisting of {cached.protein:.1f}g of protein, {cached.carbs:.1f}g of carbs, and {cached.fat:.1f}g of fat based on USDA standard data."
         }
 
     # 2. AI Parsing
@@ -91,6 +92,8 @@ def analyze_food_text(request: TextAnalysisRequest, db: Session = Depends(get_se
     db.add(new_cache)
     db.commit()
     
+    explanation = f"Your tracked meal includes {final_food_name}. It provides an estimated {total_nutrients['calories']:.0f} calories, consisting of {total_nutrients['protein']:.1f}g of protein, {total_nutrients['carbs']:.1f}g of carbs, and {total_nutrients['fat']:.1f}g of fat based on USDA standard data."
+    
     return {
         "food_name": new_cache.food_name,
         "quantity": new_cache.quantity,
@@ -102,7 +105,8 @@ def analyze_food_text(request: TextAnalysisRequest, db: Session = Depends(get_se
         "fiber": new_cache.fiber,
         "iron": new_cache.iron,
         "calcium": new_cache.calcium,
-        "sodium": new_cache.sodium
+        "sodium": new_cache.sodium,
+        "explanation": explanation
     }
 
 @router.post("/analyze-image")
@@ -139,6 +143,8 @@ async def analyze_food_image(file: UploadFile = File(...)):
     if not food_names:
         raise HTTPException(status_code=400, detail="Could not determine nutrition for the provided image.")
 
+    explanation = f"Your tracked meal includes {', '.join(food_names)}. It provides an estimated {total_nutrients['calories']:.0f} calories, consisting of {total_nutrients['protein']:.1f}g of protein, {total_nutrients['carbs']:.1f}g of carbs, and {total_nutrients['fat']:.1f}g of fat based on USDA standard data."
+
     return {
         "food_name": ", ".join(food_names),
         "quantity": 1.0,
@@ -150,7 +156,8 @@ async def analyze_food_image(file: UploadFile = File(...)):
         "fiber": total_nutrients["fiber"],
         "iron": total_nutrients["iron"],
         "calcium": total_nutrients["calcium"],
-        "sodium": total_nutrients["sodium"]
+        "sodium": total_nutrients["sodium"],
+        "explanation": explanation
     }
 
 @router.post("/chat")
