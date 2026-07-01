@@ -10,7 +10,7 @@ def test_nutrition_system_flow():
     
     # Using 'with' triggers the FastAPI startup (lifespan) events properly
     with TestClient(app) as client:
-        # 1. Create a test user
+        # 1. Create a test user via the legacy /users/ endpoint (auto-verified, no JWT needed)
         test_user_data = {
             "username": "test_athlete_99",
             "age": 30,
@@ -36,12 +36,19 @@ def test_nutrition_system_flow():
         print(f"\n[+] Created Test User: {user['username']} (ID: {user_id})")
         print(f"    Target Calories: {user['target_calories']} kcal, Protein: {user['target_protein']}g")
 
-        # 2. Get the created user
-        response = client.get(f"/users/{user_id}")
+        # 2. Get a JWT token by logging in
+        # The legacy /users/ endpoint sets password=None so we need to use auth module directly
+        # We'll generate a token manually for this test user
+        from app.auth import create_access_token
+        token = create_access_token(data={"sub": str(user_id)})
+        auth_headers = {"Authorization": f"Bearer {token}"}
+
+        # 3. Get the created user (protected route)
+        response = client.get(f"/users/{user_id}", headers=auth_headers)
         assert response.status_code == 200
         assert response.json()["username"] == "test_athlete_99"
 
-        # 3. Create a food log entry
+        # 4. Create a food log entry (protected route)
         test_meal_data = {
             "user_id": user_id,
             "food_name": "Grilled Chicken Breast with White Rice",
@@ -57,7 +64,7 @@ def test_nutrition_system_flow():
             "sodium": 350.0
         }
         
-        response = client.post("/food-logs/", json=test_meal_data)
+        response = client.post("/food-logs/", json=test_meal_data, headers=auth_headers)
         assert response.status_code == 201
         meal = response.json()
         assert meal["food_name"] == "Grilled Chicken Breast with White Rice"
@@ -65,8 +72,8 @@ def test_nutrition_system_flow():
         meal_log_id = meal["id"]
         print(f"[+] Created Food Log Entry (ID: {meal_log_id}): {meal['food_name']}")
 
-        # 4. Check user logs summary
-        response = client.get(f"/food-logs/user/{user_id}/summary")
+        # 5. Check user logs summary (protected route)
+        response = client.get(f"/food-logs/user/{user_id}/summary", headers=auth_headers)
         assert response.status_code == 200
         summaries = response.json()
         assert len(summaries) > 0
@@ -76,17 +83,17 @@ def test_nutrition_system_flow():
         assert today_summary["total_protein"] == 42.0
         print(f"[+] Daily Summary verification passed for today ({today_str}).")
 
-        # 5. Delete the user
-        response = client.delete(f"/users/{user_id}")
+        # 6. Delete the user (protected route)
+        response = client.delete(f"/users/{user_id}", headers=auth_headers)
         assert response.status_code == 204
         print(f"[+] Deleted Test User (ID: {user_id}).")
 
-        # 6. Verify user is deleted
-        response = client.get(f"/users/{user_id}")
+        # 7. Verify user is deleted
+        response = client.get(f"/users/{user_id}", headers=auth_headers)
         assert response.status_code == 404
         
-        # 7. Verify food log is also deleted (cascading check)
-        response = client.get(f"/food-logs/{meal_log_id}")
+        # 8. Verify food log is also deleted (cascading check)
+        response = client.get(f"/food-logs/{meal_log_id}", headers=auth_headers)
         assert response.status_code == 404
         print("[+] Cascading delete verification passed: Food log deleted successfully.")
 
@@ -109,22 +116,27 @@ def test_google_login_flow():
             # 1. Perform Google login (registers new user since email does not exist)
             response = client.post("/users/google-login", json={"credential": "mock_token_123"})
             assert response.status_code == 200, f"Error: {response.text}"
-            user = response.json()
+            data = response.json()
+            # Response now returns {"access_token": ..., "user": {...}}
+            assert "access_token" in data
+            user = data["user"]
             assert user["email"] == "test_google_user@gmail.com"
             assert user["username"] == "test_google_user"
             assert user["is_verified"] is True
             user_id = user["id"]
+            token = data["access_token"]
+            auth_headers = {"Authorization": f"Bearer {token}"}
             print(f"\n[+] Created Mock Google User (ID: {user_id})")
 
             # 2. Perform Google login again (retrieves the existing user)
             response = client.post("/users/google-login", json={"credential": "mock_token_123"})
             assert response.status_code == 200, f"Error: {response.text}"
-            user_existing = response.json()
-            assert user_existing["id"] == user_id
+            data_existing = response.json()
+            assert "access_token" in data_existing
+            assert data_existing["user"]["id"] == user_id
             print("[+] Successfully logged in existing Google user")
 
-            # 3. Clean up test user
-            response = client.delete(f"/users/{user_id}")
+            # 3. Clean up test user (protected route)
+            response = client.delete(f"/users/{user_id}", headers=auth_headers)
             assert response.status_code == 204
             print("[+] Cleaned up test Google user successfully")
-
