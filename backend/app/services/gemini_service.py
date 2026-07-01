@@ -1,11 +1,13 @@
 import os
 import json
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from app.config import settings
 
 # Configure SDK
+client = None
 if settings.GEMINI_API_KEY and "REPLACE" not in settings.GEMINI_API_KEY:
-    genai.configure(api_key=settings.GEMINI_API_KEY)
+    client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
 # System Prompt to guide the model
 NUTRITION_SYSTEM_INSTRUCTION = """
@@ -31,17 +33,18 @@ If you are unsure, make a reasonable estimate based on standard FDA database val
 def parse_food_text(text_description: str) -> dict:
     if not settings.GEMINI_API_KEY or "REPLACE" in settings.GEMINI_API_KEY:
         raise ValueError("Gemini API key is not configured in .env.")
-        
-    model = genai.GenerativeModel(
-        model_name="gemini-3.5-flash",
-        system_instruction=NUTRITION_SYSTEM_INSTRUCTION
+    if not client:
+        raise ValueError("Gemini client could not be initialized.")
+
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=text_description,
+        config=types.GenerateContentConfig(
+            system_instruction=NUTRITION_SYSTEM_INSTRUCTION,
+            response_mime_type="application/json"
+        )
     )
-    
-    response = model.generate_content(
-        text_description,
-        generation_config={"response_mime_type": "application/json"}
-    )
-    
+
     try:
         return json.loads(response.text)
     except Exception as e:
@@ -51,22 +54,20 @@ def parse_food_text(text_description: str) -> dict:
 def parse_food_image(image_bytes: bytes, mime_type: str) -> dict:
     if not settings.GEMINI_API_KEY or "REPLACE" in settings.GEMINI_API_KEY:
         raise ValueError("Gemini API key is not configured in .env.")
-        
-    model = genai.GenerativeModel(
-        model_name="gemini-3.5-flash",
-        system_instruction=NUTRITION_SYSTEM_INSTRUCTION
+    if not client:
+        raise ValueError("Gemini client could not be initialized.")
+
+    image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[image_part, "Analyze this food image and provide the nutrient breakdown."],
+        config=types.GenerateContentConfig(
+            system_instruction=NUTRITION_SYSTEM_INSTRUCTION,
+            response_mime_type="application/json"
+        )
     )
-    
-    image_part = {
-        "mime_type": mime_type,
-        "data": image_bytes
-    }
-    
-    response = model.generate_content(
-        [image_part, "Analyze this food image and provide the nutrient breakdown."],
-        generation_config={"response_mime_type": "application/json"}
-    )
-    
+
     try:
         return json.loads(response.text)
     except Exception as e:

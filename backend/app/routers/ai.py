@@ -5,7 +5,8 @@ from pydantic import BaseModel
 from app.database import get_session
 from app.models import User
 from app.services import gemini_service
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from app.auth import get_current_user
 
 router = APIRouter(prefix="/ai", tags=["AI Integration"])
@@ -85,25 +86,29 @@ Do not refer to yourself as an AI, speak naturally as a human coach.
 """
 
     try:
-        # We can use the GenAI Chat Session object or structure the request manually.
-        # Structured manually using the GenerativeModel class is safer and highly predictable.
-        model = genai.GenerativeModel(
-            model_name="gemini-3.5-flash",
-            system_instruction=coach_prompt_context
-        )
-        
+        from app.services.gemini_service import client as genai_client
+        if not genai_client:
+            raise HTTPException(status_code=500, detail="Gemini client is not initialized.")
+
         # Build contents from history
         contents = []
         for msg in request.history:
-            # Map role names
             role = "user" if msg.role == "user" else "model"
-            contents.append({"role": role, "parts": [msg.content]})
-            
+            contents.append(types.Content(role=role, parts=[types.Part(text=msg.content)]))
+
         # Append latest message
-        contents.append({"role": "user", "parts": [request.message]})
-        
-        response = model.generate_content(contents)
+        contents.append(types.Content(role="user", parts=[types.Part(text=request.message)]))
+
+        response = genai_client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction=coach_prompt_context
+            )
+        )
         return {"response": response.text}
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[-] Error in AI Coach Chat endpoint: {e}")
         raise HTTPException(status_code=400, detail=str(e))
