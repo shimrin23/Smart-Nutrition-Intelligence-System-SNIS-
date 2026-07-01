@@ -4,7 +4,7 @@ from typing import List, Optional, Dict
 from pydantic import BaseModel
 from app.database import get_session
 from app.models import User, FoodCache
-from app.services import gemini_service, usda_service
+from app.services import gemini_service
 from google import genai
 from google.genai import types
 from app.auth import get_current_user
@@ -47,52 +47,31 @@ def analyze_food_text(request: TextAnalysisRequest, db: Session = Depends(get_se
             "explanation": f"Your tracked meal includes {cached.food_name}. It provides an estimated {cached.calories:.0f} calories, consisting of {cached.protein:.1f}g of protein, {cached.carbs:.1f}g of carbs, and {cached.fat:.1f}g of fat based on USDA standard data."
         }
 
-    # 2. AI Parsing
+    # 2. AI Parsing & Calculation
     try:
-        items = gemini_service.parse_food_text(request.text)
+        data = gemini_service.parse_food_text(request.text)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
         
-    # 3. USDA Lookup & Summation
-    total_nutrients = {
-        "calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0,
-        "fiber": 0.0, "iron": 0.0, "calcium": 0.0, "sodium": 0.0
-    }
-    food_names = []
-    
-    for item in items:
-        try:
-            nutrients = usda_service.get_nutrition_for_item(item.get("food_name", ""), item.get("weight_grams", 100))
-            food_names.append(nutrients["food_name"])
-            for key in total_nutrients.keys():
-                total_nutrients[key] += nutrients[key]
-        except Exception as e:
-            print(f"Failed to fetch USDA for {item.get('food_name')}: {e}")
-            
-    if not food_names:
-        raise HTTPException(status_code=400, detail="Could not determine nutrition for the provided text.")
-
-    final_food_name = ", ".join(food_names)
-    
-    # 4. Save to Cache
+    # 3. Save to Cache
     new_cache = FoodCache(
         query_string=query_str,
-        food_name=final_food_name,
-        quantity=1.0,
-        unit="serving",
-        calories=total_nutrients["calories"],
-        protein=total_nutrients["protein"],
-        carbs=total_nutrients["carbs"],
-        fat=total_nutrients["fat"],
-        fiber=total_nutrients["fiber"],
-        iron=total_nutrients["iron"],
-        calcium=total_nutrients["calcium"],
-        sodium=total_nutrients["sodium"]
+        food_name=data.get("food_name", "AI Estimated Meal"),
+        quantity=data.get("quantity", 1.0),
+        unit=data.get("unit", "serving"),
+        calories=data.get("calories", 0.0),
+        protein=data.get("protein", 0.0),
+        carbs=data.get("carbs", 0.0),
+        fat=data.get("fat", 0.0),
+        fiber=data.get("fiber", 0.0),
+        iron=data.get("iron", 0.0),
+        calcium=data.get("calcium", 0.0),
+        sodium=data.get("sodium", 0.0)
     )
     db.add(new_cache)
     db.commit()
     
-    explanation = f"Your tracked meal includes {final_food_name}. It provides an estimated {total_nutrients['calories']:.0f} calories, consisting of {total_nutrients['protein']:.1f}g of protein, {total_nutrients['carbs']:.1f}g of carbs, and {total_nutrients['fat']:.1f}g of fat based on USDA standard data."
+    explanation = data.get("explanation", "AI analyzed this meal based on standard estimations.")
     
     return {
         "food_name": new_cache.food_name,
@@ -121,42 +100,24 @@ async def analyze_food_image(file: UploadFile = File(...)):
         
     try:
         contents = await file.read()
-        items = gemini_service.parse_food_image(contents, file.content_type)
+        data = gemini_service.parse_food_image(contents, file.content_type)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
         
-    total_nutrients = {
-        "calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0,
-        "fiber": 0.0, "iron": 0.0, "calcium": 0.0, "sodium": 0.0
-    }
-    food_names = []
-    
-    for item in items:
-        try:
-            nutrients = usda_service.get_nutrition_for_item(item.get("food_name", ""), item.get("weight_grams", 100))
-            food_names.append(nutrients["food_name"])
-            for key in total_nutrients.keys():
-                total_nutrients[key] += nutrients[key]
-        except Exception as e:
-            print(f"Failed to fetch USDA for image item {item.get('food_name')}: {e}")
-            
-    if not food_names:
-        raise HTTPException(status_code=400, detail="Could not determine nutrition for the provided image.")
-
-    explanation = f"Your tracked meal includes {', '.join(food_names)}. It provides an estimated {total_nutrients['calories']:.0f} calories, consisting of {total_nutrients['protein']:.1f}g of protein, {total_nutrients['carbs']:.1f}g of carbs, and {total_nutrients['fat']:.1f}g of fat based on USDA standard data."
+    explanation = data.get("explanation", "AI analyzed this meal based on standard estimations.")
 
     return {
-        "food_name": ", ".join(food_names),
-        "quantity": 1.0,
-        "unit": "serving",
-        "calories": total_nutrients["calories"],
-        "protein": total_nutrients["protein"],
-        "carbs": total_nutrients["carbs"],
-        "fat": total_nutrients["fat"],
-        "fiber": total_nutrients["fiber"],
-        "iron": total_nutrients["iron"],
-        "calcium": total_nutrients["calcium"],
-        "sodium": total_nutrients["sodium"],
+        "food_name": data.get("food_name", "Analyzed Image Meal"),
+        "quantity": data.get("quantity", 1.0),
+        "unit": data.get("unit", "serving"),
+        "calories": data.get("calories", 0.0),
+        "protein": data.get("protein", 0.0),
+        "carbs": data.get("carbs", 0.0),
+        "fat": data.get("fat", 0.0),
+        "fiber": data.get("fiber", 0.0),
+        "iron": data.get("iron", 0.0),
+        "calcium": data.get("calcium", 0.0),
+        "sodium": data.get("sodium", 0.0),
         "explanation": explanation
     }
 

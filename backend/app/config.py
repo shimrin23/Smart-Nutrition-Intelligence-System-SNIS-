@@ -16,7 +16,7 @@ class Settings:
         return f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    USDA_API_KEY: str = os.getenv("USDA_API_KEY", "")
+
 
     # Mail settings
     MAIL_USERNAME: str = os.getenv("MAIL_USERNAME", "")

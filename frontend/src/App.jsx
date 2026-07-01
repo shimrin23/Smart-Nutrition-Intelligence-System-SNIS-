@@ -585,19 +585,7 @@ function App() {
       });
       if (res.ok) {
         const data = await res.json();
-        setNewLog({
-          food_name: data.food_name || aiTextInput,
-          quantity: data.quantity || 100,
-          unit: data.unit || 'grams',
-          calories: Math.round(data.calories || 0),
-          protein: Math.round(data.protein || 0),
-          carbs: Math.round(data.carbs || 0),
-          fat: Math.round(data.fat || 0),
-          fiber: Math.round(data.fiber || 0),
-          iron: data.iron || 0,
-          calcium: data.calcium || 0,
-          sodium: data.sodium || 0
-        });
+
         setAiAnalysis(data);
         setAiTextInput('');
       } else {
@@ -628,19 +616,7 @@ function App() {
       });
       if (res.ok) {
         const data = await res.json();
-        setNewLog({
-          food_name: data.food_name || "Meal Image",
-          quantity: data.quantity || 100,
-          unit: data.unit || 'grams',
-          calories: Math.round(data.calories || 0),
-          protein: Math.round(data.protein || 0),
-          carbs: Math.round(data.carbs || 0),
-          fat: Math.round(data.fat || 0),
-          fiber: Math.round(data.fiber || 0),
-          iron: data.iron || 0,
-          calcium: data.calcium || 0,
-          sodium: data.sodium || 0
-        });
+
         setAiAnalysis(data);
       } else {
         const err = await res.json();
@@ -1182,7 +1158,6 @@ function App() {
                                     fetchSummary(activeUser.id, currentSummaryRange.start, currentSummaryRange.end);
                                     fetchMlData(activeUser.id);
                                     setAiAnalysis(null);
-                                    alert("Successfully added to Today's Energy Balance!");
                                   } else {
                                     alert("Failed to add food.");
                                   }

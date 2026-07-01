@@ -10,22 +10,27 @@ if settings.GEMINI_API_KEY and "REPLACE" not in settings.GEMINI_API_KEY:
     client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
 NUTRITION_SYSTEM_INSTRUCTION = """
-You are a precise nutrition parser. Your job is to analyze food descriptions or food images and extract the individual food items and their estimated weights.
-Do NOT attempt to calculate calories or macros yourself.
+You are an expert AI Nutritionist. Your job is to analyze food descriptions or food images and estimate the total nutritional values for the entire meal.
+You MUST calculate and return the estimated total macronutrients and micronutrients.
 
-Always return a JSON array (list) of objects, where each object has the following fields:
-- food_name (str): A clean, standardized name for the food item (e.g., "Egg", "White Rice", "Chicken Breast").
-- weight_grams (float): The estimated weight of the portion in grams. If the user explicitly provides a weight in grams (e.g. 100g) or volume in ml (e.g. 500ml), you MUST use that exact numerical value. If they do not provide a weight, you must estimate it based on the user's provided quantity (e.g., 1 large egg = 50g, 1 cup white rice = 158g, 1 slice bread = 30g). If you are unsure, make a reasonable estimate for a standard serving.
+Return a single JSON object with the following fields:
+- food_name (str): A clean, human-readable name summarizing the meal (e.g., "2 Eggs and 1 Cup White Rice").
+- quantity (float): 1.0
+- unit (str): "serving"
+- calories (float): Total estimated calories for the entire meal.
+- protein (float): Total estimated protein in grams.
+- carbs (float): Total estimated carbohydrates in grams.
+- fat (float): Total estimated fat in grams.
+- fiber (float): Total estimated fiber in grams.
+- iron (float): Total estimated iron in mg.
+- calcium (float): Total estimated calcium in mg.
+- sodium (float): Total estimated sodium in mg.
+- explanation (str): A 2-3 sentence explanation of the nutritional value of this meal and any health benefits or things to watch out for.
 
-Return ONLY the JSON array. Do not include any other text or markdown formatting.
-Example output:
-[
-  {"food_name": "Large Egg", "weight_grams": 100},
-  {"food_name": "White Rice", "weight_grams": 158}
-]
+Return ONLY the JSON object. Do not include any markdown formatting or extra text.
 """
 
-def parse_food_text(text_description: str) -> list:
+def parse_food_text(text_description: str) -> dict:
     if not settings.GEMINI_API_KEY or "REPLACE" in settings.GEMINI_API_KEY:
         raise ValueError("Gemini API key is not configured in .env.")
     if not client:
@@ -46,7 +51,7 @@ def parse_food_text(text_description: str) -> list:
         print(f"[-] Error parsing Gemini response: {e}. Raw response: {response.text}")
         raise ValueError("Failed to parse nutrition details from the AI response.")
 
-def parse_food_image(image_bytes: bytes, mime_type: str) -> list:
+def parse_food_image(image_bytes: bytes, mime_type: str) -> dict:
     if not settings.GEMINI_API_KEY or "REPLACE" in settings.GEMINI_API_KEY:
         raise ValueError("Gemini API key is not configured in .env.")
     if not client:
