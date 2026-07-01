@@ -32,7 +32,7 @@ def parse_food_text(text_description: str) -> list:
         raise ValueError("Gemini client could not be initialized.")
 
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-3.1-flash-lite",
         contents=text_description,
         config=types.GenerateContentConfig(
             system_instruction=NUTRITION_SYSTEM_INSTRUCTION,
@@ -55,7 +55,7 @@ def parse_food_image(image_bytes: bytes, mime_type: str) -> list:
     image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
 
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-3.1-flash-lite",
         contents=[image_part, "Analyze this food image and provide the nutrient breakdown."],
         config=types.GenerateContentConfig(
             system_instruction=NUTRITION_SYSTEM_INSTRUCTION,

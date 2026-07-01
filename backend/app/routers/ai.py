@@ -204,7 +204,7 @@ Do not refer to yourself as an AI, speak naturally as a human coach.
         contents.append(types.Content(role="user", parts=[types.Part(text=request.message)]))
 
         response = genai_client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-3.1-flash-lite",
             contents=contents,
             config=types.GenerateContentConfig(
                 system_instruction=coach_prompt_context
