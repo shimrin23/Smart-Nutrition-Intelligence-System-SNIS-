@@ -1,10 +1,10 @@
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, status
-from sqlmodel import Session
+from sqlmodel import Session, select
 from typing import List, Optional, Dict
 from pydantic import BaseModel
 from app.database import get_session
-from app.models import User
-from app.services import gemini_service
+from app.models import User, FoodCache
+from app.services import gemini_service, usda_service
 from google import genai
 from google.genai import types
 from app.auth import get_current_user
@@ -25,12 +25,85 @@ class ChatRequest(BaseModel):
     history: List[ChatHistoryMessage] = []
 
 @router.post("/analyze-text")
-def analyze_food_text(request: TextAnalysisRequest):
+def analyze_food_text(request: TextAnalysisRequest, db: Session = Depends(get_session)):
+    query_str = request.text.lower().strip()
+    
+    # 1. Check Cache
+    statement = select(FoodCache).where(FoodCache.query_string == query_str)
+    cached = db.exec(statement).first()
+    if cached:
+        return {
+            "food_name": cached.food_name,
+            "quantity": cached.quantity,
+            "unit": cached.unit,
+            "calories": cached.calories,
+            "protein": cached.protein,
+            "carbs": cached.carbs,
+            "fat": cached.fat,
+            "fiber": cached.fiber,
+            "iron": cached.iron,
+            "calcium": cached.calcium,
+            "sodium": cached.sodium
+        }
+
+    # 2. AI Parsing
     try:
-        nutrition_data = gemini_service.parse_food_text(request.text)
-        return nutrition_data
+        items = gemini_service.parse_food_text(request.text)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+        
+    # 3. USDA Lookup & Summation
+    total_nutrients = {
+        "calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0,
+        "fiber": 0.0, "iron": 0.0, "calcium": 0.0, "sodium": 0.0
+    }
+    food_names = []
+    
+    for item in items:
+        try:
+            nutrients = usda_service.get_nutrition_for_item(item.get("food_name", ""), item.get("weight_grams", 100))
+            food_names.append(nutrients["food_name"])
+            for key in total_nutrients.keys():
+                total_nutrients[key] += nutrients[key]
+        except Exception as e:
+            print(f"Failed to fetch USDA for {item.get('food_name')}: {e}")
+            
+    if not food_names:
+        raise HTTPException(status_code=400, detail="Could not determine nutrition for the provided text.")
+
+    final_food_name = ", ".join(food_names)
+    
+    # 4. Save to Cache
+    new_cache = FoodCache(
+        query_string=query_str,
+        food_name=final_food_name,
+        quantity=1.0,
+        unit="serving",
+        calories=total_nutrients["calories"],
+        protein=total_nutrients["protein"],
+        carbs=total_nutrients["carbs"],
+        fat=total_nutrients["fat"],
+        fiber=total_nutrients["fiber"],
+        iron=total_nutrients["iron"],
+        calcium=total_nutrients["calcium"],
+        sodium=total_nutrients["sodium"]
+    )
+    db.add(new_cache)
+    db.commit()
+    
+    return {
+        "food_name": new_cache.food_name,
+        "quantity": new_cache.quantity,
+        "unit": new_cache.unit,
+        "calories": new_cache.calories,
+        "protein": new_cache.protein,
+        "carbs": new_cache.carbs,
+        "fat": new_cache.fat,
+        "fiber": new_cache.fiber,
+        "iron": new_cache.iron,
+        "calcium": new_cache.calcium,
+        "sodium": new_cache.sodium
+    }
 
 @router.post("/analyze-image")
 async def analyze_food_image(file: UploadFile = File(...)):
@@ -44,10 +117,41 @@ async def analyze_food_image(file: UploadFile = File(...)):
         
     try:
         contents = await file.read()
-        nutrition_data = gemini_service.parse_food_image(contents, file.content_type)
-        return nutrition_data
+        items = gemini_service.parse_food_image(contents, file.content_type)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+        
+    total_nutrients = {
+        "calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0,
+        "fiber": 0.0, "iron": 0.0, "calcium": 0.0, "sodium": 0.0
+    }
+    food_names = []
+    
+    for item in items:
+        try:
+            nutrients = usda_service.get_nutrition_for_item(item.get("food_name", ""), item.get("weight_grams", 100))
+            food_names.append(nutrients["food_name"])
+            for key in total_nutrients.keys():
+                total_nutrients[key] += nutrients[key]
+        except Exception as e:
+            print(f"Failed to fetch USDA for image item {item.get('food_name')}: {e}")
+            
+    if not food_names:
+        raise HTTPException(status_code=400, detail="Could not determine nutrition for the provided image.")
+
+    return {
+        "food_name": ", ".join(food_names),
+        "quantity": 1.0,
+        "unit": "serving",
+        "calories": total_nutrients["calories"],
+        "protein": total_nutrients["protein"],
+        "carbs": total_nutrients["carbs"],
+        "fat": total_nutrients["fat"],
+        "fiber": total_nutrients["fiber"],
+        "iron": total_nutrients["iron"],
+        "calcium": total_nutrients["calcium"],
+        "sodium": total_nutrients["sodium"]
+    }
 
 @router.post("/chat")
 def chat_coach(request: ChatRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_session)):

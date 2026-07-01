@@ -61,3 +61,23 @@ class FoodLog(SQLModel, table=True):
     
     # Relationship back to User
     user: Optional[User] = Relationship(back_populates="food_logs")
+
+class FoodCache(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    query_string: str = Field(index=True, unique=True, nullable=False)
+    
+    food_name: str
+    quantity: float
+    unit: str
+    
+    calories: float
+    protein: float
+    carbs: float
+    fat: float
+    fiber: float = Field(default=0.0)
+    iron: float = Field(default=0.0)
+    calcium: float = Field(default=0.0)
+    sodium: float = Field(default=0.0)
+    
+    source: str = Field(default="usda")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
