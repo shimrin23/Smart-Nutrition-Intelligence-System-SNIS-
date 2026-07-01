@@ -469,7 +469,6 @@ function App() {
         const data = await res.json();
         setActiveUser(data);
         fetchMlData(data.id);
-        alert("Profile updated and target nutrition recalculated!");
       } else {
         const errData = await res.json();
         alert(`Error updating profile: ${errData.detail || 'Unknown error'}`);
@@ -493,7 +492,6 @@ function App() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
-        alert("Account deleted successfully.");
         handleSignOut();
       } else {
         alert("Failed to delete account. Please try again.");

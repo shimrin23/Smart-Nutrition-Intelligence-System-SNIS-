@@ -31,8 +31,11 @@ class Settings:
     # Resend email API (SMTP is blocked on Railway)
     RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
 
-    # JWT Authentication
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-key-change-in-production")
+    import secrets
+    SECRET_KEY: str = os.getenv("SECRET_KEY")
+    if not SECRET_KEY or SECRET_KEY == "your-super-secret-key-change-in-production":
+        SECRET_KEY = secrets.token_urlsafe(32)
+        print("WARNING: No SECRET_KEY found in environment. A temporary random key was generated. Tokens will be invalidated upon server restart.")
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
