@@ -79,5 +79,5 @@ class FoodCache(SQLModel, table=True):
     calcium: float = Field(default=0.0)
     sodium: float = Field(default=0.0)
     
-    source: str = Field(default="usda")
+    source: str = Field(default="ai")
     created_at: datetime = Field(default_factory=datetime.utcnow)

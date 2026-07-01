@@ -44,7 +44,7 @@ def analyze_food_text(request: TextAnalysisRequest, db: Session = Depends(get_se
             "iron": cached.iron,
             "calcium": cached.calcium,
             "sodium": cached.sodium,
-            "explanation": f"Your tracked meal includes {cached.food_name}. It provides an estimated {cached.calories:.0f} calories, consisting of {cached.protein:.1f}g of protein, {cached.carbs:.1f}g of carbs, and {cached.fat:.1f}g of fat based on USDA standard data."
+            "explanation": f"Your tracked meal includes {cached.food_name}. It provides an estimated {cached.calories:.0f} calories, consisting of {cached.protein:.1f}g of protein, {cached.carbs:.1f}g of carbs, and {cached.fat:.1f}g of fat based on AI estimations."
         }
 
     # 2. AI Parsing & Calculation
