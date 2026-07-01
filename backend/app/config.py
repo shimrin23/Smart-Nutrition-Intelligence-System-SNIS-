@@ -30,4 +30,9 @@ class Settings:
     # Resend email API (SMTP is blocked on Railway)
     RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
 
+    # JWT Authentication
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-key-change-in-production")
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+
 settings = Settings()
