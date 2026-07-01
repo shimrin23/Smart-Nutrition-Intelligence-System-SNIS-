@@ -1114,7 +1114,7 @@ function App() {
                           </h2>
                           
                           <div style={{ marginBottom: '16px' }}>
-                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Estimated Food</span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Identified Food</span>
                             <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'white', marginTop: '2px' }}>{aiAnalysis.food_name}</h3>
                           </div>
                           
