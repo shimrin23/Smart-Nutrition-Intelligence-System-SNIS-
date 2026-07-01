@@ -1151,33 +1151,49 @@ function App() {
                               type="button"
                               className="btn btn-primary" 
                               style={{ flex: 2, padding: '10px 16px' }}
-                              onClick={() => {
-                                setNewLog({
-                                  food_name: aiAnalysis.food_name || '',
-                                  quantity: aiAnalysis.quantity || 100,
-                                  unit: aiAnalysis.unit || 'grams',
-                                  calories: Math.round(aiAnalysis.calories || 0),
-                                  protein: Math.round(aiAnalysis.protein || 0),
-                                  carbs: Math.round(aiAnalysis.carbs || 0),
-                                  fat: Math.round(aiAnalysis.fat || 0),
-                                  fiber: Math.round(aiAnalysis.fiber || 0),
-                                  iron: aiAnalysis.iron || 0,
-                                  calcium: aiAnalysis.calcium || 0,
-                                  sodium: aiAnalysis.sodium || 0
-                                });
-                                // Visual anchor feedback
-                                const element = document.getElementById("manual-food-logger-card");
-                                if (element) {
-                                  element.scrollIntoView({ behavior: 'smooth' });
-                                  element.style.borderColor = 'var(--primary)';
-                                  setTimeout(() => {
-                                    element.style.borderColor = 'var(--border-light)';
-                                  }, 2000);
+                              onClick={async () => {
+                                if (!activeUser) {
+                                  alert("Please select or create a user profile first!");
+                                  return;
+                                }
+                                const token = localStorage.getItem('token');
+                                const logData = {
+                                  food_name: aiAnalysis.food_name || "",
+                                  quantity: aiAnalysis.quantity === '' ? 0.0 : parseFloat(aiAnalysis.quantity || 1),
+                                  unit: aiAnalysis.unit || "serving",
+                                  calories: aiAnalysis.calories === '' ? 0.0 : parseFloat(Math.round(aiAnalysis.calories || 0)),
+                                  protein: aiAnalysis.protein === '' ? 0.0 : parseFloat(Math.round(aiAnalysis.protein || 0)),
+                                  carbs: aiAnalysis.carbs === '' ? 0.0 : parseFloat(Math.round(aiAnalysis.carbs || 0)),
+                                  fat: aiAnalysis.fat === '' ? 0.0 : parseFloat(Math.round(aiAnalysis.fat || 0)),
+                                  fiber: aiAnalysis.fiber === '' ? 0.0 : parseFloat(Math.round(aiAnalysis.fiber || 0)),
+                                  iron: aiAnalysis.iron === '' ? 0.0 : parseFloat(aiAnalysis.iron || 0),
+                                  calcium: aiAnalysis.calcium === '' ? 0.0 : parseFloat(aiAnalysis.calcium || 0),
+                                  sodium: aiAnalysis.sodium === '' ? 0.0 : parseFloat(aiAnalysis.sodium || 0),
+                                  user_id: activeUser.id
+                                };
+                                try {
+                                  const res = await fetch(`${API_BASE}/food-logs/`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                    body: JSON.stringify(logData)
+                                  });
+                                  if (res.ok) {
+                                    fetchLogs(activeUser.id);
+                                    fetchSummary(activeUser.id, currentSummaryRange.start, currentSummaryRange.end);
+                                    fetchMlData(activeUser.id);
+                                    setAiAnalysis(null);
+                                    alert("Successfully added to Today's Energy Balance!");
+                                  } else {
+                                    alert("Failed to add food.");
+                                  }
+                                } catch(e) {
+                                  console.error("Error adding AI food:", e);
+                                  alert("Error connecting to server.");
                                 }
                               }}
                             >
                               <ListPlus size={16} />
-                              <span>Add to Manual Logger</span>
+                              <span>Add to Energy Balance</span>
                             </button>
                             <button 
                               type="button"
