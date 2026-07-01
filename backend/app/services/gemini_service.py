@@ -15,7 +15,7 @@ Do NOT attempt to calculate calories or macros yourself.
 
 Always return a JSON array (list) of objects, where each object has the following fields:
 - food_name (str): A clean, standardized name for the food item (e.g., "Egg", "White Rice", "Chicken Breast").
-- weight_grams (float): The estimated weight of the portion in grams. You must estimate this based on the user's provided quantity (e.g., 1 large egg = 50g, 1 cup white rice = 158g, 1 slice bread = 30g). If you are unsure, make a reasonable estimate for a standard serving.
+- weight_grams (float): The estimated weight of the portion in grams. If the user explicitly provides a weight in grams (e.g. 100g) or volume in ml (e.g. 500ml), you MUST use that exact numerical value. If they do not provide a weight, you must estimate it based on the user's provided quantity (e.g., 1 large egg = 50g, 1 cup white rice = 158g, 1 slice bread = 30g). If you are unsure, make a reasonable estimate for a standard serving.
 
 Return ONLY the JSON array. Do not include any other text or markdown formatting.
 Example output:
