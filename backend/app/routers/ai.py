@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, status
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, status, Request
 from sqlmodel import Session, select
 from typing import List, Optional, Dict
 from pydantic import BaseModel
@@ -8,6 +8,8 @@ from app.services import gemini_service
 from google import genai
 from google.genai import types
 from app.auth import get_current_user
+
+from app.limiter import limiter
 
 router = APIRouter(prefix="/ai", tags=["AI Integration"])
 
@@ -25,8 +27,9 @@ class ChatRequest(BaseModel):
     history: List[ChatHistoryMessage] = []
 
 @router.post("/analyze-text")
-def analyze_food_text(request: TextAnalysisRequest, db: Session = Depends(get_session)):
-    query_str = request.text.lower().strip()
+@limiter.limit("3/minute")
+def analyze_food_text(request: Request, body_request: TextAnalysisRequest, db: Session = Depends(get_session)):
+    query_str = body_request.text.lower().strip()
     
     # 1. Check Cache
     statement = select(FoodCache).where(FoodCache.query_string == query_str)
@@ -49,7 +52,7 @@ def analyze_food_text(request: TextAnalysisRequest, db: Session = Depends(get_se
 
     # 2. AI Parsing & Calculation
     try:
-        data = gemini_service.parse_food_text(request.text)
+        data = gemini_service.parse_food_text(body_request.text)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
         
@@ -89,7 +92,8 @@ def analyze_food_text(request: TextAnalysisRequest, db: Session = Depends(get_se
     }
 
 @router.post("/analyze-image")
-async def analyze_food_image(file: UploadFile = File(...)):
+@limiter.limit("3/minute")
+async def analyze_food_image(request: Request, file: UploadFile = File(...)):
     # Validate file type
     allowed_types = ["image/jpeg", "image/png", "image/webp"]
     if file.content_type not in allowed_types:
@@ -98,8 +102,17 @@ async def analyze_food_image(file: UploadFile = File(...)):
             detail=f"Invalid file type: {file.content_type}. Only JPEG, PNG, and WEBP images are supported."
         )
         
+    MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+    contents = b""
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        contents += chunk
+        if len(contents) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=413, detail="File too large. Maximum size is 5MB.")
+            
     try:
-        contents = await file.read()
         data = gemini_service.parse_food_image(contents, file.content_type)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -122,10 +135,11 @@ async def analyze_food_image(file: UploadFile = File(...)):
     }
 
 @router.post("/chat")
-def chat_coach(request: ChatRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_session)):
-    if current_user.id != request.user_id:
+@limiter.limit("3/minute")
+def chat_coach(request: Request, body_request: ChatRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_session)):
+    if current_user.id != body_request.user_id:
         raise HTTPException(status_code=403, detail="Not authorized")
-    user = db.get(User, request.user_id)
+    user = db.get(User, body_request.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User profile not found")
         
@@ -164,12 +178,12 @@ Do not refer to yourself as an AI, speak naturally as a human coach.
 
         # Build contents from history
         contents = []
-        for msg in request.history:
+        for msg in body_request.history:
             role = "user" if msg.role == "user" else "model"
             contents.append(types.Content(role=role, parts=[types.Part(text=msg.content)]))
 
         # Append latest message
-        contents.append(types.Content(role="user", parts=[types.Part(text=request.message)]))
+        contents.append(types.Content(role="user", parts=[types.Part(text=body_request.message)]))
 
         response = genai_client.models.generate_content(
             model="gemini-3.1-flash-lite",

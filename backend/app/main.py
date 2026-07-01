@@ -4,6 +4,9 @@ from app.database import init_db
 from app.routers import users, food_logs, ai, ml
 from app.config import settings
 from contextlib import asynccontextmanager
+from app.limiter import limiter
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -24,6 +27,9 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Configure CORS so our React frontend can connect
 allowed_origins = [

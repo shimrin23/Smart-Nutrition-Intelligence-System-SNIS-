@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
 from sqlmodel import Session, select
 from typing import List, Optional
 from app.database import get_session
@@ -15,6 +15,7 @@ from email.mime.multipart import MIMEMultipart
 import resend
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
+from app.limiter import limiter
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -182,7 +183,8 @@ def calculate_targets(weight_kg, height_cm, age, gender, activity_level, goal):
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
 @router.post("/register", response_model=User, status_code=status.HTTP_201_CREATED)
-def register_user(user_data: UserRegister, background_tasks: BackgroundTasks, db: Session = Depends(get_session)):
+@limiter.limit("3/minute")
+def register_user(request: Request, user_data: UserRegister, background_tasks: BackgroundTasks, db: Session = Depends(get_session)):
     """Register with email + password. Sends verification email."""
     # Check if email already registered
     existing = db.exec(select(User).where(User.email == user_data.email.lower())).first()
@@ -246,7 +248,8 @@ def verify_email(token: str, db: Session = Depends(get_session)):
 
 
 @router.post("/login")
-def login_user(login_data: UserLogin, db: Session = Depends(get_session)):
+@limiter.limit("3/minute")
+def login_user(request: Request, login_data: UserLogin, db: Session = Depends(get_session)):
     """Login with email + password."""
     user = db.exec(select(User).where(User.email == login_data.email.lower())).first()
     if not user:
@@ -263,9 +266,10 @@ def login_user(login_data: UserLogin, db: Session = Depends(get_session)):
 
 
 @router.post("/forgot-password")
-def forgot_password(request: ForgotPasswordRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_session)):
+@limiter.limit("3/minute")
+def forgot_password(request: Request, body_request: ForgotPasswordRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_session)):
     """Send password reset link to email."""
-    user = db.exec(select(User).where(User.email == request.email.lower())).first()
+    user = db.exec(select(User).where(User.email == body_request.email.lower())).first()
     # Always return success (security: don't reveal if email exists)
     if user and user.is_verified:
         token = generate_token()
@@ -278,16 +282,17 @@ def forgot_password(request: ForgotPasswordRequest, background_tasks: Background
 
 
 @router.post("/reset-password")
-def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_session)):
+@limiter.limit("3/minute")
+def reset_password(request: Request, body_request: ResetPasswordRequest, db: Session = Depends(get_session)):
     """Reset password using token from email link."""
-    user = db.exec(select(User).where(User.reset_token == request.token)).first()
+    user = db.exec(select(User).where(User.reset_token == body_request.token)).first()
     if not user:
         raise HTTPException(status_code=400, detail="Invalid or expired reset link")
 
     if user.reset_token_expiry and datetime.utcnow() > user.reset_token_expiry:
         raise HTTPException(status_code=400, detail="Reset link has expired. Please request a new one.")
 
-    user.password = get_password_hash(request.new_password)
+    user.password = get_password_hash(body_request.new_password)
     user.reset_token = None
     user.reset_token_expiry = None
     db.add(user)
@@ -296,7 +301,8 @@ def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_sess
 
 
 @router.post("/google-login")
-def google_login(request: GoogleLoginRequest, db: Session = Depends(get_session)):
+@limiter.limit("3/minute")
+def google_login(request: Request, body_request: GoogleLoginRequest, db: Session = Depends(get_session)):
     """Sign in / Register with Google OAuth ID Token."""
     if not settings.GOOGLE_CLIENT_ID:
         raise HTTPException(status_code=500, detail="Google login is not configured on this server.")
@@ -304,7 +310,7 @@ def google_login(request: GoogleLoginRequest, db: Session = Depends(get_session)
     try:
         # Verify the Google ID token
         id_info = google_id_token.verify_oauth2_token(
-            request.credential,
+            body_request.credential,
             google_requests.Request(),
             settings.GOOGLE_CLIENT_ID
         )
@@ -373,9 +379,10 @@ def google_login(request: GoogleLoginRequest, db: Session = Depends(get_session)
 
 
 @router.post("/resend-verification")
-def resend_verification(request: ForgotPasswordRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_session)):
+@limiter.limit("3/minute")
+def resend_verification(request: Request, body_request: ForgotPasswordRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_session)):
     """Resend the email verification link."""
-    user = db.exec(select(User).where(User.email == request.email.lower())).first()
+    user = db.exec(select(User).where(User.email == body_request.email.lower())).first()
     if user and not user.is_verified:
         token = generate_token()
         user.verification_token = token
