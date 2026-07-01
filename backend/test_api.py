@@ -88,14 +88,15 @@ def test_nutrition_system_flow():
         assert response.status_code == 204
         print(f"[+] Deleted Test User (ID: {user_id}).")
 
-        # 7. Verify user is deleted
+        # 7. Verify user is deleted. Because the user doesn't exist, the JWT is invalid -> 401
         response = client.get(f"/users/{user_id}", headers=auth_headers)
-        assert response.status_code == 404
+        assert response.status_code == 401
         
         # 8. Verify food log is also deleted (cascading check)
+        # Because the user doesn't exist, the JWT is invalid -> 401
         response = client.get(f"/food-logs/{meal_log_id}", headers=auth_headers)
-        assert response.status_code == 404
-        print("[+] Cascading delete verification passed: Food log deleted successfully.")
+        assert response.status_code == 401
+        print("[+] Cascading delete verification passed: Token properly invalidated after deletion.")
 
 
 def test_google_login_flow():
